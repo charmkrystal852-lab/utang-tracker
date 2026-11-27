@@ -1,1 +1,265 @@
-charm# utang-tracker
+<!DOCTYPE html>
+<html lang="tl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Utang Tracker</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+        body {
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 0 20px;
+            background: #f9f9f9;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .form-box {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            margin-bottom: 25px;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 6px 0 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            background: #28a745;
+            color: white;
+border: none;
+            padding: 8px 14px;
+            font-size: 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 3px;
+        }
+        button:hover {
+            background: #218838;
+        }
+        .btn-paid {
+            background: #007bff;
+        }
+        .btn-paid:hover {
+            background: #0069d9;
+        }
+        .btn-delete {
+            background: #dc3545;
+        }
+        .btn-delete:hover {
+            background: #c82333;
+        }
+        .error {
+            color: red;
+            font-size: 14px;
+            margin-bottom: 12px;
+            display: none;
+        }
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+        li {
+            background: white;
+            padding: 12px 15px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            border-left: 4px solid #dc3545;
+        }
+        li.paid {
+            opacity: 0.7;
+            border-left-color: #28a745;
+background: #f0fff4;
+        }
+        li.paid .item-text {
+            text-decoration: line-through;
+            color: #666;
+        }
+        .status {
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            display: inline-block;
+            margin-left: 8px;
+        }
+        .status.unpaid {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .status.paid {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        .total {
+            text-align: right;
+            font-size: 18px;
+            font-weight: bold;
+            color: #c62828;
+            margin-top: 10px;
+        }
+        .total-paid {
+            color: #2e7d32;
+            font-size: 15px;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>💰 Utang Tracker</h1>
+
+    <div class="form-box">
+        <h3>Magdagdag ng Utang</h3>
+        
+        <label>Pangalan ng Customer:</label>
+        <input type="text" id="name" placeholder="Hal. Aling Maria">
+<div class="error" id="name-error">❌ Pakilagay ang tamang pangalan — hindi pwedeng numero lang</div>
+
+        <label>Item / Binili:</label>
+        <input type="text" id="item" placeholder="Hal. 3kg Bigas, 2pc Sabon">
+
+        <label>Halaga (₱):</label>
+        <input type="text" id="amount" placeholder="Hal. 150">
+        <div class="error" id="amount-error">❌ Pakilagay ang tamang presyo — numero lang ang pwede</div>
+
+        <button onclick="addEntry()">➕ I-save</button>
+    </div>
+
+    <h3>📋 Listahan ng Utang</h3>
+    <ul id="debt-list"></ul>
+    
+    <div class="total" id="total-unpaid">Hindi pa Nababayaran: ₱0.00</div>
+    <div class="total total-paid" id="total-paid">Nabayaran na: ₱0.00</div>
+
+    <script>
+        let debts = JSON.parse(localStorage.getItem('utangList')) || [];
+        renderList();
+
+        function addEntry() {
+            const name = document.getElementById('name').value.trim();
+            const item = document.getElementById('item').value.trim();
+            const amountInput = document.getElementById('amount').value.trim();
+// Itago muna lahat ng error
+            document.getElementById('name-error').style.display = 'none';
+            document.getElementById('amount-error').style.display = 'none';
+
+            let mayMali = false;
+
+            // ❌ Walang pangalan
+            if (!name) {
+                document.getElementById('name-error').style.display = 'block';
+                mayMali = true;
+            }
+            // ❌ Numero lang ang pangalan
+            else if (/^[0-9]+$/.test(name)) {
+                document.getElementById('name-error').style.display = 'block';
+                mayMali = true;
+            }
+
+            // ❌ Walang halaga o hindi numero
+            if (!amountInput || isNaN(amountInput)) {
+                document.getElementById('amount-error').style.display = 'block';
+                mayMali = true;
+            }
+            else {
+                const amount = parseFloat(amountInput);
+                // ❌ 0 o negatibo
+                if (amount <= 0) {
+document.getElementById('amount-error').style.display = 'block';
+                    mayMali = true;
+                }
+            }
+
+            if (mayMali) return;
+
+            // ✅ I-save ang entry — default: HINDI PA NABABAYARAN
+            const amount = parseFloat(amountInput);
+            const entry = {
+                id: Date.now(),
+                name: name,
+                item: item || '(walang nakalagay)',
+                amount: amount,
+                paid: false  // ← HINDI PA BAYAD bilang default
+            };
+            debts.push(entry);
+            saveAndRender();
+
+            // Linisin ang mga input
+            document.getElementById('name').value = '';
+            document.getElementById('item').value = '';
+            document.getElementById('amount').value = '';
+        }
+
+        // ✅ MARK AS PAID — HINDI BUBURAHIN AGAD
+        function togglePaid(id) {
+            const debt = debts.find(d => d.id === id);
+            if (debt) {
+                debt.paid = !debt.paid;
+saveAndRender();
+            }
+        }
+
+        // ❌ BURAHIN — KAILANGAN KOMPIRMAHIN
+        function deleteEntry(id) {
+            if (confirm('Sigurado ka bang gusto mong burahin ito? Hindi na ito maibabalik!')) {
+                debts = debts.filter(d => d.id !== id);
+                saveAndRender();
+            }
+        }
+
+        function saveAndRender() {
+            localStorage.setItem('utangList', JSON.stringify(debts));
+            renderList();
+        }
+
+        function renderList() {
+            const list = document.getElementById('debt-list');
+            list.innerHTML = '';
+            let totalUnpaid = 0;
+            let totalPaid = 0;
+
+            debts.forEach(debt => {
+                if (!debt.paid) {
+                    totalUnpaid += debt.amount;
+                } else {
+                    totalPaid += debt.amount;
+                }
+
+                list.innerHTML += `
+                    <li class="${debt.paid ? 'paid' : ''}">
+                        <div>
+<strong>${debt.name}</strong>
+                            <span class="status ${debt.paid ? 'paid' : 'unpaid'}">
+                                ${debt.paid ? '✅ Nabayaran na' : '⏳ Hindi pa bayad'}
+                            </span>
+                            <br>
+                            <small class="item-text">${debt.item}</small><br>
+                            <span>₱${debt.amount.toFixed(2)}</span>
+                        </div>
+                        <div style="margin-top: 8px;">
+                            <button class="btn-paid" onclick="togglePaid(${debt.id})">
+                                ${debt.paid ? '↩️ Hindi pa' : '✅ Bayad na'}
+                            </button>
+                            <button class="btn-delete" onclick="deleteEntry(${debt.id})">🗑️ Burahin</button>
+                        </div>
+                    </li>
+                `;
+            });
+
+            document.getElementById('total-unpaid').textContent = `Hindi pa Nababayaran: ₱${totalUnpaid.toFixed(2)}`;
+            document.getElementById('total-paid').textContent = `Nabayaran na: ₱${totalPaid.toFixed(2)}`;
+        }
+    </script>
+
+</body>
+</html>
